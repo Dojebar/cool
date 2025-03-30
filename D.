@@ -1,0 +1,889 @@
+-- PlexusNovice UI Library
+-- Fixed version with all components working properly
+
+local PlexusNovice = {}
+
+-- Configuration
+local config = {
+    MainColor = Color3.fromRGB(15, 15, 20),
+    SecondaryColor = Color3.fromRGB(25, 25, 30),
+    AccentColor = Color3.fromRGB(0, 170, 255),
+    TextColor = Color3.fromRGB(240, 240, 240),
+    GlowColor = Color3.fromRGB(0, 200, 255),
+    Font = Enum.Font.GothamSemibold,
+    TitleFont = Enum.Font.GothamBold,
+    ToggleOnColor = Color3.fromRGB(0, 170, 255),
+    ToggleOffColor = Color3.fromRGB(80, 80, 85)
+}
+
+-- Utility functions
+local function createGlow(frame, color, intensity)
+    local glow = Instance.new("ImageLabel")
+    glow.Name = "GlowEffect"
+    glow.Image = "rbxassetid://5028857084"
+    glow.ImageColor3 = color or config.GlowColor
+    glow.ScaleType = Enum.ScaleType.Slice
+    glow.SliceCenter = Rect.new(24, 24, 24, 24)
+    glow.BackgroundTransparency = 1
+    glow.Size = UDim2.new(1, 10, 1, 10)
+    glow.Position = UDim2.new(0, -5, 0, -5)
+    glow.ZIndex = frame.ZIndex - 1
+    glow.ImageTransparency = 0.7 - (intensity or 0.3)
+    glow.Parent = frame
+    return glow
+end
+
+local function createRipple(button)
+    local ripple = Instance.new("Frame")
+    ripple.Name = "Ripple"
+    ripple.BackgroundColor3 = Color3.new(1, 1, 1)
+    ripple.BackgroundTransparency = 0.8
+    ripple.Size = UDim2.new(0, 0, 0, 0)
+    ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    ripple.ZIndex = button.ZIndex + 1
+    ripple.Parent = button
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = ripple
+    
+    local tweenService = game:GetService("TweenService")
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    local tween = tweenService:Create(ripple, tweenInfo, {
+        Size = UDim2.new(2, 0, 2, 0),
+        BackgroundTransparency = 1
+    })
+    
+    tween:Play()
+    tween.Completed:Connect(function()
+        ripple:Destroy()
+    end)
+end
+
+-- Main Window Creation
+function PlexusNovice:CreateWindow(title, glowPart)
+    local PlexusNovice = {}
+    
+    -- Main ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "PlexusNoviceUI"
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = game:GetService("CoreGui")
+    
+    -- Main Frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.BackgroundColor3 = config.MainColor
+    mainFrame.Size = UDim2.new(0, 400, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = mainFrame
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Color = Color3.fromRGB(40, 40, 45)
+    stroke.Thickness = 2
+    stroke.Parent = mainFrame
+    
+    -- Title Bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.BackgroundColor3 = config.SecondaryColor
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.Position = UDim2.new(0, 0, 0, 0)
+    titleBar.ZIndex = 2
+    titleBar.Parent = mainFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.Parent = titleBar
+    
+    -- Title Text with Glow
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Font = config.TitleFont
+    titleLabel.Text = title
+    titleLabel.TextColor3 = config.TextColor
+    titleLabel.TextSize = 18
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Size = UDim2.new(1, -20, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.ZIndex = 3
+    titleLabel.Parent = titleBar
+    
+    -- Add glow to specified part of the title
+    if glowPart then
+        local fullText = title
+        local startPos = string.find(fullText, glowPart, 1, true)
+        
+        if startPos then
+            local beforeText = string.sub(fullText, 1, startPos - 1)
+            local afterText = string.sub(fullText, startPos + #glowPart)
+            
+            local textSize = game:GetService("TextService"):GetTextSize(beforeText, 18, config.TitleFont, Vector2.new(9999, 40))
+            local glowSize = game:GetService("TextService"):GetTextSize(glowPart, 18, config.TitleFont, Vector2.new(9999, 40))
+            
+            local glowFrame = Instance.new("Frame")
+            glowFrame.Name = "TitleGlow"
+            glowFrame.BackgroundTransparency = 1
+            glowFrame.Size = UDim2.new(0, glowSize.X + 10, 0, 30)
+            glowFrame.Position = UDim2.new(0, textSize.X, 0, 5)
+            glowFrame.ZIndex = 2
+            glowFrame.Parent = titleBar
+            
+            createGlow(glowFrame, config.GlowColor, 0.5)
+            
+            local glowLabel = Instance.new("TextLabel")
+            glowLabel.Name = "GlowText"
+            glowLabel.Font = config.TitleFont
+            glowLabel.Text = glowPart
+            glowLabel.TextColor3 = config.GlowColor
+            glowLabel.TextSize = 18
+            glowLabel.BackgroundTransparency = 1
+            glowLabel.Size = UDim2.new(1, 0, 1, 0)
+            glowLabel.Position = UDim2.new(0, 0, 0, 0)
+            glowLabel.ZIndex = 3
+            glowLabel.Parent = glowFrame
+        end
+    end
+    
+    -- Content Frame
+    local contentFrame = Instance.new("ScrollingFrame")
+    contentFrame.Name = "Content"
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Size = UDim2.new(1, -20, 1, -60)
+    contentFrame.Position = UDim2.new(0, 10, 0, 50)
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    contentFrame.ScrollBarThickness = 4
+    contentFrame.ScrollBarImageColor3 = config.SecondaryColor
+    contentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    contentFrame.Parent = mainFrame
+    
+    local contentLayout = Instance.new("UIListLayout")
+    contentLayout.Name = "ContentLayout"
+    contentLayout.Padding = UDim.new(0, 10)
+    contentLayout.Parent = contentFrame
+    
+    -- Make window draggable
+    -- Make the window draggable
+-- Make the ENTIRE window draggable
+local dragging
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+mainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+    
+    -- Button Creation
+    function PlexusNovice:CreateButton(text, callback)
+        local button = Instance.new("TextButton")
+        button.Name = "Button"
+        button.Font = config.Font
+        button.Text = text
+        button.TextColor3 = config.TextColor
+        button.TextSize = 14
+        button.BackgroundColor3 = config.SecondaryColor
+        button.Size = UDim2.new(1, 0, 0, 35)
+        button.AutoButtonColor = false
+        button.Parent = contentFrame
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = button
+        
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(50, 50, 55)
+        stroke.Thickness = 1
+        stroke.Parent = button
+        
+        local glow = createGlow(button, config.GlowColor, 0.7)
+        glow.Visible = false
+        
+        button.MouseEnter:Connect(function()
+            game:GetService("TweenService"):Create(button, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+            }):Play()
+            glow.Visible = true
+        end)
+        
+        button.MouseLeave:Connect(function()
+            game:GetService("TweenService"):Create(button, TweenInfo.new(0.2), {
+                BackgroundColor3 = config.SecondaryColor
+            }):Play()
+            glow.Visible = false
+        end)
+        
+        button.MouseButton1Click:Connect(function()
+            createRipple(button)
+            callback()
+        end)
+        
+        return button
+    end
+    
+    -- Fixed Toggle Creation
+    function PlexusNovice:CreateToggle(text, default, callback)
+        local toggle = Instance.new("Frame")
+        toggle.Name = "Toggle"
+        toggle.BackgroundTransparency = 1
+        toggle.Size = UDim2.new(1, 0, 0, 30)
+        toggle.Parent = contentFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Font = config.Font
+        label.Text = text
+        label.TextColor3 = config.TextColor
+        label.TextSize = 14
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.BackgroundTransparency = 1
+        label.Size = UDim2.new(0.7, 0, 1, 0)
+        label.Position = UDim2.new(0, 0, 0, 0)
+        label.Parent = toggle
+        
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Name = "ToggleFrame"
+        toggleFrame.BackgroundColor3 = config.SecondaryColor
+        toggleFrame.Size = UDim2.new(0, 50, 0, 25)
+        toggleFrame.Position = UDim2.new(1, -50, 0.5, -12.5)
+        toggleFrame.AnchorPoint = Vector2.new(1, 0.5)
+        toggleFrame.Parent = toggle
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = toggleFrame
+        
+        local toggleButton = Instance.new("Frame")
+        toggleButton.Name = "ToggleButton"
+        toggleButton.BackgroundColor3 = config.ToggleOffColor
+        toggleButton.Size = UDim2.new(0, 21, 0, 21)
+        toggleButton.Position = UDim2.new(0, 2, 0.5, -10.5)
+        toggleButton.AnchorPoint = Vector2.new(0, 0.5)
+        toggleButton.Parent = toggleFrame
+        
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(1, 0)
+        buttonCorner.Parent = toggleButton
+        
+        local glow = createGlow(toggleButton, config.GlowColor, 0.6)
+        glow.Visible = false
+        
+        local state = default or false
+        
+        local function updateToggle()
+            if state then
+                game:GetService("TweenService"):Create(toggleButton, TweenInfo.new(0.2), {
+                    Position = UDim2.new(1, -23, 0.5, -10.5),
+                    BackgroundColor3 = config.ToggleOnColor
+                }):Play()
+                game:GetService("TweenService"):Create(toggleFrame, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+                }):Play()
+                glow.Visible = true
+            else
+                game:GetService("TweenService"):Create(toggleButton, TweenInfo.new(0.2), {
+                    Position = UDim2.new(0, 2, 0.5, -10.5),
+                    BackgroundColor3 = config.ToggleOffColor
+                }):Play()
+                game:GetService("TweenService"):Create(toggleFrame, TweenInfo.new(0.2), {
+                    BackgroundColor3 = config.SecondaryColor
+                }):Play()
+                glow.Visible = false
+            end
+            if callback then
+                callback(state)
+            end
+        end
+        
+        toggleFrame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                state = not state
+                updateToggle()
+            end
+        end)
+        
+        updateToggle()
+        
+        local toggleObject = {}
+        
+        function toggleObject:Set(value)
+            if state ~= value then
+                state = value
+                updateToggle()
+            end
+        end
+        
+        function toggleObject:Get()
+            return state
+        end
+        
+        return toggleObject
+    end
+    
+    -- Slider Creation
+    function PlexusNovice:CreateSlider(text, min, max, default, callback)
+        local slider = Instance.new("Frame")
+        slider.Name = "Slider"
+        slider.BackgroundTransparency = 1
+        slider.Size = UDim2.new(1, 0, 0, 60)
+        slider.Parent = contentFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Font = config.Font
+        label.Text = text
+        label.TextColor3 = config.TextColor
+        label.TextSize = 14
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.BackgroundTransparency = 1
+        label.Size = UDim2.new(1, 0, 0, 20)
+        label.Position = UDim2.new(0, 0, 0, 0)
+        label.Parent = slider
+        
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Name = "ValueLabel"
+        valueLabel.Font = config.Font
+        valueLabel.Text = tostring(default or min)
+        valueLabel.TextColor3 = config.TextColor
+        valueLabel.TextSize = 14
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Size = UDim2.new(1, 0, 0, 20)
+        valueLabel.Position = UDim2.new(0, 0, 0, 0)
+        valueLabel.Parent = slider
+        
+        local sliderTrack = Instance.new("Frame")
+        sliderTrack.Name = "Track"
+        sliderTrack.BackgroundColor3 = config.SecondaryColor
+        sliderTrack.Size = UDim2.new(1, 0, 0, 5)
+        sliderTrack.Position = UDim2.new(0, 0, 0, 30)
+        sliderTrack.Parent = slider
+        
+        local trackCorner = Instance.new("UICorner")
+        trackCorner.CornerRadius = UDim.new(1, 0)
+        trackCorner.Parent = sliderTrack
+        
+        local sliderFill = Instance.new("Frame")
+        sliderFill.Name = "Fill"
+        sliderFill.BackgroundColor3 = config.GlowColor
+        sliderFill.Size = UDim2.new(0, 0, 1, 0)
+        sliderFill.Position = UDim2.new(0, 0, 0, 0)
+        sliderFill.Parent = sliderTrack
+        
+        local fillCorner = Instance.new("UICorner")
+        fillCorner.CornerRadius = UDim.new(1, 0)
+        fillCorner.Parent = sliderFill
+        
+        local sliderButton = Instance.new("TextButton")
+        sliderButton.Name = "SliderButton"
+        sliderButton.Text = ""
+        sliderButton.BackgroundColor3 = Color3.new(1, 1, 1)
+        sliderButton.Size = UDim2.new(0, 15, 0, 15)
+        sliderButton.Position = UDim2.new(0, 0, 0.5, -7.5)
+        sliderButton.AnchorPoint = Vector2.new(0, 0.5)
+        sliderButton.AutoButtonColor = false
+        sliderButton.Parent = sliderTrack
+        
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(1, 0)
+        buttonCorner.Parent = sliderButton
+        
+        local glow = createGlow(sliderButton, config.GlowColor, 0.5)
+        
+        local minValue = min or 0
+        local maxValue = max or 100
+        local currentValue = default or minValue
+        
+        local function updateSlider(value)
+            currentValue = math.clamp(value, minValue, maxValue)
+            local ratio = (currentValue - minValue) / (maxValue - minValue)
+            
+            sliderFill.Size = UDim2.new(ratio, 0, 1, 0)
+            sliderButton.Position = UDim2.new(ratio, 0, 0.5, -7.5)
+            valueLabel.Text = tostring(math.floor(currentValue))
+            
+            if callback then
+                callback(currentValue)
+            end
+        end
+        
+        local dragging = false
+        
+        sliderButton.MouseButton1Down:Connect(function()
+            dragging = true
+        end)
+        
+        game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+        
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local mousePos = game:GetService("Players").LocalPlayer:GetMouse()
+                local relativeX = mousePos.X - sliderTrack.AbsolutePosition.X
+                local ratio = math.clamp(relativeX / sliderTrack.AbsoluteSize.X, 0, 1)
+                local value = minValue + (maxValue - minValue) * ratio
+                updateSlider(value)
+            end
+        end)
+        
+        sliderTrack.MouseButton1Down:Connect(function(x, y)
+            local relativeX = x - sliderTrack.AbsolutePosition.X
+            local ratio = math.clamp(relativeX / sliderTrack.AbsoluteSize.X, 0, 1)
+            local value = minValue + (maxValue - minValue) * ratio
+            updateSlider(value)
+        end)
+        
+        updateSlider(currentValue)
+        
+        local sliderObject = {}
+        
+        function sliderObject:Set(value)
+            updateSlider(value)
+        end
+        
+        function sliderObject:Get()
+            return currentValue
+        end
+        
+        return sliderObject
+    end
+    
+    -- Dropdown Creation
+    function PlexusNovice:CreateDropdown(text, options, default, callback)
+        local dropdown = Instance.new("Frame")
+        dropdown.Name = "Dropdown"
+        dropdown.BackgroundTransparency = 1
+        dropdown.Size = UDim2.new(1, 0, 0, 30)
+        dropdown.Parent = contentFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Font = config.Font
+        label.Text = text
+        label.TextColor3 = config.TextColor
+        label.TextSize = 14
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.BackgroundTransparency = 1
+        label.Size = UDim2.new(0.7, 0, 1, 0)
+        label.Position = UDim2.new(0, 0, 0, 0)
+        label.Parent = dropdown
+        
+        local dropdownButton = Instance.new("TextButton")
+        dropdownButton.Name = "DropdownButton"
+        dropdownButton.Font = config.Font
+        dropdownButton.Text = options[default or 1] or "Select"
+        dropdownButton.TextColor3 = config.TextColor
+        dropdownButton.TextSize = 14
+        dropdownButton.BackgroundColor3 = config.SecondaryColor
+        dropdownButton.Size = UDim2.new(0.3, 0, 1, 0)
+        dropdownButton.Position = UDim2.new(0.7, 0, 0, 0)
+        dropdownButton.AutoButtonColor = false
+        dropdownButton.Parent = dropdown
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = dropdownButton
+        
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(50, 50, 55)
+        stroke.Thickness = 1
+        stroke.Parent = dropdownButton
+        
+        local glow = createGlow(dropdownButton, config.GlowColor, 0.7)
+        glow.Visible = false
+        
+        local dropdownFrame = Instance.new("Frame")
+        dropdownFrame.Name = "DropdownFrame"
+        dropdownFrame.BackgroundColor3 = config.SecondaryColor
+        dropdownFrame.Size = UDim2.new(0.3, 0, 0, 0)
+        dropdownFrame.Position = UDim2.new(0.7, 0, 1, 5)
+        dropdownFrame.ClipsDescendants = true
+        dropdownFrame.Visible = false
+        dropdownFrame.Parent = dropdown
+        
+        local dropdownCorner = Instance.new("UICorner")
+        dropdownCorner.CornerRadius = UDim.new(0, 6)
+        dropdownCorner.Parent = dropdownFrame
+        
+        local dropdownStroke = Instance.new("UIStroke")
+        dropdownStroke.Color = Color3.fromRGB(50, 50, 55)
+        dropdownStroke.Thickness = 1
+        dropdownStroke.Parent = dropdownFrame
+        
+        local dropdownLayout = Instance.new("UIListLayout")
+        dropdownLayout.Parent = dropdownFrame
+        
+        local selectedOption = options[default or 1]
+        
+        for i, option in ipairs(options) do
+            local optionButton = Instance.new("TextButton")
+            optionButton.Name = "Option_" .. option
+            optionButton.Font = config.Font
+            optionButton.Text = option
+            optionButton.TextColor3 = config.TextColor
+            optionButton.TextSize = 14
+            optionButton.BackgroundColor3 = config.SecondaryColor
+            optionButton.Size = UDim2.new(1, 0, 0, 30)
+            optionButton.AutoButtonColor = false
+            optionButton.Parent = dropdownFrame
+            
+            optionButton.MouseEnter:Connect(function()
+                game:GetService("TweenService"):Create(optionButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+                }):Play()
+            end)
+            
+            optionButton.MouseLeave:Connect(function()
+                game:GetService("TweenService"):Create(optionButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = config.SecondaryColor
+                }):Play()
+            end)
+            
+            optionButton.MouseButton1Click:Connect(function()
+                selectedOption = option
+                dropdownButton.Text = option
+                dropdownFrame.Visible = false
+                dropdownFrame.Size = UDim2.new(0.3, 0, 0, 0)
+                if callback then
+                    callback(option)
+                end
+            end)
+        end
+        
+        dropdownButton.MouseEnter:Connect(function()
+            game:GetService("TweenService"):Create(dropdownButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+            }):Play()
+            glow.Visible = true
+        end)
+        
+        dropdownButton.MouseLeave:Connect(function()
+            game:GetService("TweenService"):Create(dropdownButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = config.SecondaryColor
+            }):Play()
+            glow.Visible = false
+        end)
+        
+        dropdownButton.MouseButton1Click:Connect(function()
+            dropdownFrame.Visible = not dropdownFrame.Visible
+            
+            if dropdownFrame.Visible then
+                local optionCount = #options
+                dropdownFrame.Size = UDim2.new(0.3, 0, 0, math.min(optionCount * 30 + (optionCount - 1) * 2, 150))
+            else
+                dropdownFrame.Size = UDim2.new(0.3, 0, 0, 0)
+            end
+        end)
+        
+        local dropdownObject = {}
+        
+        function dropdownObject:Set(option)
+            if table.find(options, option) then
+                selectedOption = option
+                dropdownButton.Text = option
+                if callback then
+                    callback(option)
+                end
+            end
+        end
+        
+        function dropdownObject:Get()
+            return selectedOption
+        end
+        
+        return dropdownObject
+    end
+    
+    -- ColorPicker Creation
+    function PlexusNovice:CreateColorPicker(text, default, callback)
+        local colorPicker = Instance.new("Frame")
+        colorPicker.Name = "ColorPicker"
+        colorPicker.BackgroundTransparency = 1
+        colorPicker.Size = UDim2.new(1, 0, 0, 30)
+        colorPicker.Parent = contentFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Font = config.Font
+        label.Text = text
+        label.TextColor3 = config.TextColor
+        label.TextSize = 14
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.BackgroundTransparency = 1
+        label.Size = UDim2.new(0.7, 0, 1, 0)
+        label.Position = UDim2.new(0, 0, 0, 0)
+        label.Parent = colorPicker
+        
+        local colorButton = Instance.new("TextButton")
+        colorButton.Name = "ColorButton"
+        colorButton.Text = ""
+        colorButton.BackgroundColor3 = default or Color3.fromRGB(255, 0, 0)
+        colorButton.Size = UDim2.new(0.3, 0, 1, 0)
+        colorButton.Position = UDim2.new(0.7, 0, 0, 0)
+        colorButton.AutoButtonColor = false
+        colorButton.Parent = colorPicker
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = colorButton
+        
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(50, 50, 55)
+        stroke.Thickness = 1
+        stroke.Parent = colorButton
+        
+        local glow = createGlow(colorButton, colorButton.BackgroundColor3, 0.7)
+        glow.Visible = false
+        
+        local colorPickerFrame = Instance.new("Frame")
+        colorPickerFrame.Name = "ColorPickerFrame"
+        colorPickerFrame.BackgroundColor3 = config.SecondaryColor
+        colorPickerFrame.Size = UDim2.new(0, 200, 0, 150)
+        colorPickerFrame.Position = UDim2.new(0.7, 5, 1, 5)
+        colorPickerFrame.Visible = false
+        colorPickerFrame.Parent = colorPicker
+        
+        local pickerCorner = Instance.new("UICorner")
+        pickerCorner.CornerRadius = UDim.new(0, 6)
+        pickerCorner.Parent = colorPickerFrame
+        
+        local pickerStroke = Instance.new("UIStroke")
+        pickerStroke.Color = Color3.fromRGB(50, 50, 55)
+        pickerStroke.Thickness = 1
+        pickerStroke.Parent = colorPickerFrame
+        
+        -- Color spectrum
+        local colorSpectrum = Instance.new("ImageLabel")
+        colorSpectrum.Name = "ColorSpectrum"
+        colorSpectrum.Image = "rbxassetid://2615689005"
+        colorSpectrum.Size = UDim2.new(0, 150, 0, 150)
+        colorSpectrum.Position = UDim2.new(0, 5, 0, 0)
+        colorSpectrum.BackgroundTransparency = 1
+        colorSpectrum.Parent = colorPickerFrame
+        
+        -- Brightness slider
+        local brightnessSlider = Instance.new("Frame")
+        brightnessSlider.Name = "BrightnessSlider"
+        brightnessSlider.BackgroundColor3 = Color3.new(1, 1, 1)
+        brightnessSlider.Size = UDim2.new(0, 20, 0, 150)
+        brightnessSlider.Position = UDim2.new(1, -25, 0, 0)
+        brightnessSlider.Parent = colorPickerFrame
+        
+        local brightnessGradient = Instance.new("UIGradient")
+        brightnessGradient.Rotation = 90
+        brightnessGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
+        }
+        brightnessGradient.Parent = brightnessSlider
+        
+        local brightnessSelector = Instance.new("Frame")
+        brightnessSelector.Name = "BrightnessSelector"
+        brightnessSelector.BackgroundColor3 = Color3.new(1, 1, 1)
+        brightnessSelector.Size = UDim2.new(1, 4, 0, 4)
+        brightnessSelector.Position = UDim2.new(0, -2, 0.5, -2)
+        brightnessSelector.AnchorPoint = Vector2.new(0, 0.5)
+        brightnessSelector.Parent = brightnessSlider
+        
+        local selectorCorner = Instance.new("UICorner")
+        selectorCorner.CornerRadius = UDim.new(1, 0)
+        selectorCorner.Parent = brightnessSelector
+        
+        local selectorStroke = Instance.new("UIStroke")
+        selectorStroke.Color = Color3.new(0, 0, 0)
+        selectorStroke.Thickness = 1
+        selectorStroke.Parent = brightnessSelector
+        
+        -- Selected color preview
+        local colorPreview = Instance.new("Frame")
+        colorPreview.Name = "ColorPreview"
+        colorPreview.BackgroundColor3 = default or Color3.fromRGB(255, 0, 0)
+        colorPreview.Size = UDim2.new(0, 30, 0, 30)
+        colorPreview.Position = UDim2.new(0, 160, 0, 5)
+        colorPreview.Parent = colorPickerFrame
+        
+        local previewCorner = Instance.new("UICorner")
+        previewCorner.CornerRadius = UDim.new(0, 6)
+        previewCorner.Parent = colorPreview
+        
+        local previewStroke = Instance.new("UIStroke")
+        previewStroke.Color = Color3.fromRGB(50, 50, 55)
+        previewStroke.Thickness = 1
+        previewStroke.Parent = colorPreview
+        
+        local hue, saturation, value = (default or Color3.fromRGB(255, 0, 0)):ToHSV()
+        brightnessSelector.Position = UDim2.new(0, -2, value, -2)
+        
+        local function updateColor(h, s, v)
+            hue, saturation, value = h, s, v
+            local color = Color3.fromHSV(hue, saturation, value)
+            colorButton.BackgroundColor3 = color
+            colorPreview.BackgroundColor3 = color
+            glow.ImageColor3 = color
+            if callback then
+                callback(color)
+            end
+        end
+        
+        colorButton.MouseEnter:Connect(function()
+            game:GetService("TweenService"):Create(colorButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(
+                    math.clamp(colorButton.BackgroundColor3.R * 255 + 20, 0, 255),
+                    math.clamp(colorButton.BackgroundColor3.G * 255 + 20, 0, 255),
+                    math.clamp(colorButton.BackgroundColor3.B * 255 + 20, 0, 255)
+                ) / 255
+            }):Play()
+            glow.Visible = true
+        end)
+        
+        colorButton.MouseLeave:Connect(function()
+            game:GetService("TweenService"):Create(colorButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromHSV(hue, saturation, value)
+            }):Play()
+            glow.Visible = false
+        end)
+        
+        colorButton.MouseButton1Click:Connect(function()
+            colorPickerFrame.Visible = not colorPickerFrame.Visible
+        end)
+        
+        local spectrumDragging = false
+        local brightnessDragging = false
+        
+        colorSpectrum.MouseButton1Down:Connect(function()
+            spectrumDragging = true
+        end)
+        
+        brightnessSlider.MouseButton1Down:Connect(function()
+            brightnessDragging = true
+        end)
+        
+        game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                spectrumDragging = false
+                brightnessDragging = false
+            end
+        end)
+        
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                if spectrumDragging then
+                    local mousePos = game:GetService("Players").LocalPlayer:GetMouse()
+                    local relativeX = (mousePos.X - colorSpectrum.AbsolutePosition.X) / colorSpectrum.AbsoluteSize.X
+                    local relativeY = (mousePos.Y - colorSpectrum.AbsolutePosition.Y) / colorSpectrum.AbsoluteSize.Y
+                    
+                    hue = math.clamp(relativeX, 0, 1)
+                    saturation = 1 - math.clamp(relativeY, 0, 1)
+                    updateColor(hue, saturation, value)
+                elseif brightnessDragging then
+                    local mousePos = game:GetService("Players").LocalPlayer:GetMouse()
+                    local relativeY = (mousePos.Y - brightnessSlider.AbsolutePosition.Y) / brightnessSlider.AbsoluteSize.Y
+                    
+                    value = 1 - math.clamp(relativeY, 0, 1)
+                    brightnessSelector.Position = UDim2.new(0, -2, value, -2)
+                    updateColor(hue, saturation, value)
+                end
+            end
+        end)
+        
+        local colorPickerObject = {}
+        
+        function colorPickerObject:Set(color)
+            hue, saturation, value = color:ToHSV()
+            brightnessSelector.Position = UDim2.new(0, -2, value, -2)
+            updateColor(hue, saturation, value)
+        end
+        
+        function colorPickerObject:Get()
+            return Color3.fromHSV(hue, saturation, value)
+        end
+        
+        return colorPickerObject
+    end
+    
+    -- Section Creation
+    function PlexusNovice:CreateSection(name)
+        local section = Instance.new("Frame")
+        section.Name = "Section"
+        section.BackgroundTransparency = 1
+        section.Size = UDim2.new(1, 0, 0, 40)
+        section.Parent = contentFrame
+        
+        local line = Instance.new("Frame")
+        line.Name = "Line"
+        line.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+        line.Size = UDim2.new(1, 0, 0, 1)
+        line.Position = UDim2.new(0, 0, 0.5, 0)
+        line.AnchorPoint = Vector2.new(0, 0.5)
+        line.Parent = section
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Font = config.Font
+        label.Text = name
+        label.TextColor3 = config.TextColor
+        label.TextSize = 14
+        label.BackgroundColor3 = config.MainColor
+        label.BackgroundTransparency = 0.5
+        label.Size = UDim2.new(0, 0, 0, 20)
+        label.Position = UDim2.new(0, 10, 0.5, -10)
+        label.AnchorPoint = Vector2.new(0, 0.5)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = section
+        
+        local textSize = game:GetService("TextService"):GetTextSize(name, 14, config.Font, Vector2.new(9999, 20))
+        label.Size = UDim2.new(0, textSize.X + 10, 0, 20)
+        
+        return section
+    end
+    
+    -- Destroy function
+    function PlexusNovice:Destroy()
+        screenGui:Destroy()
+    end
+    
+    return PlexusNovice
+end
+
+return PlexusNovice
