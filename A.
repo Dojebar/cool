@@ -1,0 +1,418 @@
+local AdvancedUI = (function()
+    --!strict
+    local library = {}
+    library.__index = library
+
+    -- Metatable-based hook system
+    local HookSystem = {}
+    HookSystem.__index = HookSystem
+
+    function HookSystem.new()
+        return setmetatable({
+            _hooks = {},
+            _hookMetadata = setmetatable({}, { __mode = "k" })
+        }, HookSystem)
+    end
+
+    function HookSystem:register(hookName: string, callback: (...any) -> (...any), priority: number?)
+        local hookData = {
+            callback = callback,
+            priority = priority or 0
+        }
+        
+        if not self._hooks[hookName] then
+            self._hooks[hookName] = {}
+        end
+        
+        table.insert(self._hooks[hookName], hookData)
+        table.sort(self._hooks[hookName], function(a, b)
+            return a.priority > b.priority
+        end)
+        
+        self._hookMetadata[hookData] = {
+            name = hookName,
+            registeredAt = os.clock()
+        }
+        
+        return hookData
+    end
+
+    function HookSystem:dispatch(hookName: string, ...: any): (...any)
+        local args = {...}
+        local results = {}
+        
+        if self._hooks[hookName] then
+            for _, hookData in ipairs(self._hooks[hookName]) do
+                local success, res = pcall(hookData.callback, unpack(args))
+                if success then
+                    if res ~= nil then
+                        table.insert(results, res)
+                        args = {res} -- For chaining behavior
+                    end
+                else
+                    warn(`Hook error in {hookName}: {res}`)
+                end
+            end
+        end
+        
+        return unpack(results)
+    end
+
+    -- Component base class using metatable inheritance
+    local UIComponent = {}
+    UIComponent.__index = UIComponent
+
+    function UIComponent.new(hookSystem: any)
+        return setmetatable({
+            _hooks = hookSystem or HookSystem.new(),
+            _instances = {},
+            _state = setmetatable({}, {
+                __index = function(t, k)
+                    return rawget(t, "_"..k)
+                end,
+                __newindex = function(t, k, v)
+                    rawset(t, "_"..k, v)
+                    t._hooks:dispatch("stateChanged", k, v)
+                end
+            }),
+            _eventProxies = setmetatable({}, { __mode = "k" })
+        }, UIComponent)
+    end
+
+    function UIComponent:extend()
+        local subclass = setmetatable({
+            __parent = self
+        }, { __index = self })
+        
+        subclass.__index = subclass
+        return subclass
+    end
+
+    function UIComponent:destroy()
+        self._hooks:dispatch("beforeDestroy")
+        
+        for instance in pairs(self._instances) do
+            if instance:IsA("GuiObject") then
+                instance:Destroy()
+            end
+        end
+        
+        for proxy, connection in pairs(self._eventProxies) do
+            if connection then
+                connection:Disconnect()
+            end
+        end
+        
+        self._hooks:dispatch("afterDestroy")
+    end
+
+    -- Button implementation
+    local Button = UIComponent:extend()
+
+    function Button.new(hookSystem: any)
+        local self = setmetatable(UIComponent.new(hookSystem), Button)
+        
+        self._state.text = "Button"
+        
+        self._hooks:register("beforeRender", function()
+            if not self._state.text then
+                self._state.text = "Button"
+            end
+        end, 100)
+        
+        self._hooks:register("stateChanged", function(key: string, value: any)
+            if key == "text" and self._instances.textLabel then
+                self._instances.textLabel.Text = value
+            end
+        end)
+        
+        return self
+    end
+
+    function Button:render(parent: Instance)
+        self._hooks:dispatch("beforeRender")
+        
+        local button = Instance.new("TextButton")
+        button.Name = "AdvancedButton"
+        button.Size = UDim2.new(0, 200, 0, 50)
+        button.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.SourceSansBold
+        button.TextSize = 18
+        button.Text = self._state.text
+        button.Parent = parent
+        
+        self._instances.button = button
+        self._instances.textLabel = button
+        
+        -- Event proxy with hook support
+        local clickProxy = newproxy(true)
+        local clickMt = getmetatable(clickProxy)
+        
+        local connection = button.MouseButton1Click:Connect(function()
+            self._hooks:dispatch("buttonClicked")
+        end)
+        
+        clickMt.__index = function(t, k)
+            if k == "Connect" then
+                return function(_, callback)
+                    return self._hooks:register("buttonClicked", callback)
+                end
+            elseif k == "Text" then
+                return self._state.text
+            end
+        end
+        
+        clickMt.__newindex = function(t, k, v)
+            if k == "Text" then
+                self._state.text = v
+            end
+        end
+        
+        clickMt.__metatable = "Locked metatable"
+        
+        self._eventProxies[clickProxy] = connection
+        
+        self._hooks:dispatch("afterRender")
+        
+        return button, clickProxy
+    end
+
+    -- Toggle implementation
+    local Toggle = UIComponent:extend()
+
+    function Toggle.new(hookSystem: any)
+        local self = setmetatable(UIComponent.new(hookSystem), Toggle)
+        
+        self._state.value = false
+        
+        self._hooks:register("stateChanged", function(key: string, value: any)
+            if key == "value" and self._instances.toggleFrame then
+                local color = value and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                self._instances.toggleFrame.BackgroundColor3 = color
+                
+                if self._instances.toggleKnob then
+                    local position = value and UDim2.new(1, -10, 0.5, 0) or UDim2.new(0, 10, 0.5, 0)
+                    self._instances.toggleKnob.Position = position
+                end
+            end
+        end)
+        
+        return self
+    end
+
+    function Toggle:render(parent: Instance)
+        local frame = Instance.new("Frame")
+        frame.Name = "AdvancedToggle"
+        frame.Size = UDim2.new(0, 60, 0, 30)
+        frame.BackgroundColor3 = self._state.value and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        frame.BorderSizePixel = 0
+        frame.ClipsDescendants = true
+        frame.Parent = parent
+        
+        local knob = Instance.new("Frame")
+        knob.Name = "Knob"
+        knob.Size = UDim2.new(0, 20, 0, 20)
+        knob.Position = self._state.value and UDim2.new(1, -10, 0.5, 0) or UDim2.new(0, 10, 0.5, 0)
+        knob.AnchorPoint = Vector2.new(0.5, 0.5)
+        knob.BackgroundColor3 = Color3.new(1, 1, 1)
+        knob.BorderSizePixel = 0
+        knob.Parent = frame
+        
+        self._instances.toggleFrame = frame
+        self._instances.toggleKnob = knob
+        
+        -- Toggle proxy with hook support
+        local toggleProxy = newproxy(true)
+        local toggleMt = getmetatable(toggleProxy)
+        
+        local function toggleValue()
+            self._state.value = not self._state.value
+            self._hooks:dispatch("toggleChanged", self._state.value)
+        end
+        
+        local connections = {
+            frame.MouseButton1Click:Connect(toggleValue),
+            knob.MouseButton1Click:Connect(toggleValue)
+        }
+        
+        toggleMt.__index = function(t, k)
+            if k == "Connect" then
+                return function(_, callback)
+                    return self._hooks:register("toggleChanged", callback)
+                end
+            elseif k == "Value" then
+                return self._state.value
+            end
+        end
+        
+        toggleMt.__newindex = function(t, k, v)
+            if k == "Value" then
+                self._state.value = v
+            end
+        end
+        
+        toggleMt.__metatable = "Locked metatable"
+        
+        for _, conn in ipairs(connections) do
+            self._eventProxies[conn] = conn
+        end
+        
+        return frame, toggleProxy
+    end
+
+    -- Slider implementation
+    local Slider = UIComponent:extend()
+
+    function Slider.new(hookSystem: any)
+        local self = setmetatable(UIComponent.new(hookSystem), Slider)
+        
+        self._state = {
+            _value = 0.5,
+            _min = 0,
+            _max = 1,
+            _step = 0.01
+        }
+        
+        self._hooks:register("stateChanged", function(key: string, value: any)
+            if key == "value" and self._instances.fill then
+                local percent = (value - self._state.min) / (self._state.max - self._state.min)
+                self._instances.fill.Size = UDim2.new(percent, 0, 1, 0)
+                
+                if self._instances.valueText then
+                    self._instances.valueText.Text = string.format("%.2f", value)
+                end
+            end
+        end)
+        
+        return self
+    end
+
+    function Slider:render(parent: Instance)
+        local slider = Instance.new("Frame")
+        slider.Name = "AdvancedSlider"
+        slider.Size = UDim2.new(0, 200, 0, 30)
+        slider.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        slider.BorderSizePixel = 0
+        slider.ClipsDescendants = true
+        slider.Parent = parent
+        
+        local fill = Instance.new("Frame")
+        fill.Name = "Fill"
+        fill.Size = UDim2.new(self._state.value, 0, 1, 0)
+        fill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        fill.BorderSizePixel = 0
+        fill.Parent = slider
+        
+        local valueText = Instance.new("TextLabel")
+        valueText.Name = "ValueText"
+        valueText.Size = UDim2.new(1, 0, 1, 0)
+        valueText.BackgroundTransparency = 1
+        valueText.Text = string.format("%.2f", self._state.value)
+        valueText.TextColor3 = Color3.new(1, 1, 1)
+        valueText.Font = Enum.Font.SourceSans
+        valueText.TextSize = 14
+        valueText.Parent = slider
+        
+        self._instances.slider = slider
+        self._instances.fill = fill
+        self._instances.valueText = valueText
+        
+        -- Slider proxy with hook support
+        local sliderProxy = newproxy(true)
+        local sliderMt = getmetatable(sliderProxy)
+        
+        local function setValueFromMouse()
+            local mouse = game:GetService("Players").LocalPlayer:GetMouse()
+            local xOffset = mouse.X - slider.AbsolutePosition.X
+            local percent = math.clamp(xOffset / slider.AbsoluteSize.X, 0, 1)
+            
+            local steppedValue = math.floor((percent * (self._state.max - self._state.min) + self._state.min) / self._state.step + 0.5) * self._state.step
+            steppedValue = math.clamp(steppedValue, self._state.min, self._state.max)
+            
+            self._state.value = steppedValue
+            self._hooks:dispatch("sliderChanged", steppedValue)
+        end
+        
+        local connection1 = slider.MouseButton1Down:Connect(setValueFromMouse)
+        local connection2 = slider.MouseMoved:Connect(function()
+            if not game:GetService("UserInputService"):IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                return
+            end
+            setValueFromMouse()
+        end)
+        
+        sliderMt.__index = function(t, k)
+            if k == "Connect" then
+                return function(_, callback)
+                    return self._hooks:register("sliderChanged", callback)
+                end
+            elseif k == "Value" then
+                return self._state.value
+            elseif k == "Min" then
+                return self._state.min
+            elseif k == "Max" then
+                return self._state.max
+            elseif k == "Step" then
+                return self._state.step
+            end
+        end
+        
+        sliderMt.__newindex = function(t, k, v)
+            if k == "Value" then
+                self._state.value = math.clamp(v, self._state.min, self._state.max)
+            elseif k == "Min" then
+                self._state.min = v
+                self._state.value = math.max(self._state.value, v)
+            elseif k == "Max" then
+                self._state.max = v
+                self._state.value = math.min(self._state.value, v)
+            elseif k == "Step" then
+                self._state.step = math.max(0.001, v)
+            end
+        end
+        
+        sliderMt.__metatable = "Locked metatable"
+        
+        self._eventProxies[connection1] = connection1
+        self._eventProxies[connection2] = connection2
+        
+        return slider, sliderProxy
+    end
+
+    -- Library interface
+    function library.createButton(parent: Instance, text: string?, hookSystem: any?)
+        local button = Button.new(hookSystem)
+        button._state.text = text or "Button"
+        local instance, proxy = button:render(parent)
+        return instance, proxy, button
+    end
+
+    function library.createToggle(parent: Instance, initialValue: boolean?, hookSystem: any?)
+        local toggle = Toggle.new(hookSystem)
+        toggle._state.value = initialValue or false
+        local instance, proxy = toggle:render(parent)
+        return instance, proxy, toggle
+    end
+
+    function library.createSlider(parent: Instance, options: {
+        value: number?,
+        min: number?,
+        max: number?,
+        step: number?
+    }?, hookSystem: any?)
+        local slider = Slider.new(hookSystem)
+        
+        if options then
+            if options.min then slider._state.min = options.min end
+            if options.max then slider._state.max = options.max end
+            if options.step then slider._state.step = options.step end
+            if options.value then slider._state.value = math.clamp(options.value, slider._state.min, slider._state.max) end
+        end
+        
+        local instance, proxy = slider:render(parent)
+        return instance, proxy, slider
+    end
+
+    return library
+end)()
